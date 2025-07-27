@@ -1,9 +1,55 @@
 spring:
   application:
     name: Leger
-
+  ai:
+    openai:
+      api-key: sk-9a8856e1a552470ea3cbeeb9b3f4db9a
+      base-url: https://dashscope.aliyuncs.com/compatible-mode
+      chat:
+        options:
+          model: qwen-max-latest
+          temperature: 0.7
+      embedding:
+        options:
+          model: text-embedding-v3
+          dimensions: 1024
+    vectorstore:
+      pinecone:
+        api-key: pcsk_4wuZvE_AJw6GmknZsKA73HFyCfRGFsNioaj6WjiJun9MeH7Gjkx56ryKxK4TpB2oz7zJhX
+        index-name: my-first-springai
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/ledger?serverTimezone=Asia/Shanghai&useSSL=false&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&transformedBitIsBoolean=true&tinyInt1isBit=false&allowPublicKeyRetrieval=true&allowMultiQueries=true&useServerPrepStmts=false
     username: root
     password: 123456
+
+  # MyBatis Plus配置
+  mybatis-plus:
+    configuration:
+      map-underscore-to-camel-case: true
+      log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    global-config:
+      db-config:
+        logic-delete-field: deleted
+        logic-delete-value: 1
+        logic-not-delete-value: 0
+
+# JWT配置
+app:
+  jwt:
+    secret: QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm1234567890!@#$%^&*()_+QWERTYUIOPASDFGHJKLZXCVBNM
+    expiration: 86400000  # 24小时，单位：毫秒
+
+# 服务器配置
+server:
+  port: 8080
+
+# Swagger配置
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /docs.html
+    enabled: true
+    tags-sorter: alpha
+    operations-sorter: alpha
