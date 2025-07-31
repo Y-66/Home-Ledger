@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.yu.ledger.mapper.RepaymentScheduleMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.yu.ledger.entity.po.RepaymentSchedule">
+        <id column="schedule_id" property="scheduleId" />
+        <result column="contract_id" property="contractId" />
+        <result column="period_start" property="periodStart" />
+        <result column="period_end" property="periodEnd" />
+        <result column="due_date" property="dueDate" />
+        <result column="calculated_interest" property="calculatedInterest" />
+        <result column="period_status" property="periodStatus" />
+        <result column="last_reminder_date" property="lastReminderDate" />
+        <result column="payment_date" property="paymentDate" />
+        <result column="created_at" property="createdAt" />
+    </resultMap>
+
+</mapper>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.yu.ledger.mapper.ReminderLogsMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.yu.ledger.entity.po.ReminderLogs">
+        <id column="reminder_id" property="reminderId" />
+        <result column="schedule_id" property="scheduleId" />
+        <result column="reminder_type" property="reminderType" />
+        <result column="reminder_channel" property="reminderChannel" />
+        <result column="sent_at" property="sentAt" />
+        <result column="recipient" property="recipient" />
+        <result column="reminder_status" property="reminderStatus" />
+        <result column="failure_reason" property="failureReason" />
+    </resultMap>
+
+</mapper>
