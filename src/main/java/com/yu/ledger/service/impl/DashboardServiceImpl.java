@@ -1,11 +1,13 @@
 package com.yu.ledger.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.yu.ledger.entity.po.LoanContracts;
 import com.yu.ledger.entity.po.RepaymentSchedule;
 import com.yu.ledger.mapper.LoanContractsMapper;
 import com.yu.ledger.mapper.RepaymentScheduleMapper;
 import com.yu.ledger.service.IDashboardService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -13,17 +15,22 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
+
 import com.yu.ledger.entity.po.Customers;
 import com.yu.ledger.mapper.CustomersMapper;
 
+import static com.yu.ledger.entity.enums.PeriodStatusEnum.*;
+
 @Service
+@RequiredArgsConstructor
 public class DashboardServiceImpl implements IDashboardService {
-    @Autowired
-    private LoanContractsMapper loanContractsMapper;
-    @Autowired
-    private RepaymentScheduleMapper repaymentScheduleMapper;
-    @Autowired
-    private CustomersMapper customersMapper;
+
+    private final LoanContractsMapper loanContractsMapper;
+
+    private final RepaymentScheduleMapper repaymentScheduleMapper;
+
+    private final CustomersMapper customersMapper;
 
     @Override
     public Map<String, Object> getStats() {
@@ -38,8 +45,8 @@ public class DashboardServiceImpl implements IDashboardService {
         // 2. 本月利息收入
         LocalDate now = LocalDate.now();
         BigDecimal monthlyInterestIncome = repaymentScheduleMapper.selectList(
-                new QueryWrapper<RepaymentSchedule>()
-                        .eq("period_status", "paid")
+                new LambdaQueryWrapper<RepaymentSchedule>()
+                        .eq(RepaymentSchedule::getPeriodStatus, PAID)
                         //.ge("payment_date", now.withDayOfMonth(1))
                         //.le("payment_date", now)
         ).stream().map(RepaymentSchedule::getCalculatedInterest)
@@ -49,15 +56,15 @@ public class DashboardServiceImpl implements IDashboardService {
 
         // 3. 逾期合同数
         long overdueContracts = repaymentScheduleMapper.selectList(
-                new QueryWrapper<RepaymentSchedule>()
-                        .eq("period_status", "overdue")
+                new LambdaQueryWrapper<RepaymentSchedule>()
+                        .eq(RepaymentSchedule::getPeriodStatus, OVERDUE)
         ).stream().map(RepaymentSchedule::getContractId).distinct().count();
         stats.put("overdueContracts", overdueContracts);
 
         // 4. 逾期金额
         BigDecimal overdueAmount = repaymentScheduleMapper.selectList(
-                new QueryWrapper<RepaymentSchedule>()
-                        .eq("period_status", "overdue")
+                new LambdaQueryWrapper<RepaymentSchedule>()
+                        .eq(RepaymentSchedule::getPeriodStatus, OVERDUE)
         ).stream().map(RepaymentSchedule::getCalculatedInterest)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -78,11 +85,11 @@ public class DashboardServiceImpl implements IDashboardService {
         
         // 查询最近30天内到期的还款计划
         List<RepaymentSchedule> dueList = repaymentScheduleMapper.selectList(
-                new QueryWrapper<RepaymentSchedule>()
-                        .ge("due_date", today)
-                        .le("due_date", thirtyDaysLater)
-                        .in("period_status", Arrays.asList("pending", "overdue"))
-                        .orderByAsc("due_date")
+                new LambdaQueryWrapper<RepaymentSchedule>()
+                        .ge(RepaymentSchedule::getDueDate, today)
+                        .le(RepaymentSchedule::getDueDate, thirtyDaysLater)
+                        .in(RepaymentSchedule::getPeriodStatus, Arrays.asList(PENDING, OVERDUE))
+                        .orderByAsc(RepaymentSchedule::getDueDate)
         );
         
         List<Map<String, Object>> result = new ArrayList<>();
@@ -123,48 +130,58 @@ public class DashboardServiceImpl implements IDashboardService {
         List<Map<String, Object>> activities = new ArrayList<>();
         // 1. 最近还款
         List<RepaymentSchedule> paidList = repaymentScheduleMapper.selectList(
-                new QueryWrapper<RepaymentSchedule>()
-                        .eq("period_status", "paid")
-                        .orderByDesc("payment_date")
+                new LambdaQueryWrapper<RepaymentSchedule>()
+                        .eq(RepaymentSchedule::getPeriodStatus, PAID)
+                        .orderByDesc(RepaymentSchedule::getPaymentDate)
                         .last("limit 5")
         );
-        for (RepaymentSchedule schedule : paidList) {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", schedule.getScheduleId());
-            map.put("type", "payment");
-            map.put("title", "合同" + schedule.getContractId() + "完成利息支付 ¥" + schedule.getCalculatedInterest());
-            map.put("time", schedule.getPaymentDate() != null ? schedule.getPaymentDate().toString() : "");
-            activities.add(map);
-        }
+        List<Map<String, Object>> list = paidList.stream()
+                .map(schedule -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", schedule.getScheduleId());
+                    map.put("type", "payment");
+                    map.put("title", "合同" + schedule.getContractId() + "完成利息支付 ¥" + schedule.getCalculatedInterest());
+                    map.put("time", schedule.getPaymentDate() != null ? schedule.getPaymentDate().toString() : "");
+                    activities.add(map);
+                    return map;
+                })
+                .toList();
+
         // 2. 最近逾期
         List<RepaymentSchedule> overdueList = repaymentScheduleMapper.selectList(
-                new QueryWrapper<RepaymentSchedule>()
-                        .eq("period_status", "overdue")
-                        .orderByDesc("due_date")
+                new LambdaQueryWrapper<RepaymentSchedule>()
+                        .eq(RepaymentSchedule::getPeriodStatus, OVERDUE)
+                        .orderByDesc(RepaymentSchedule::getDueDate)
                         .last("limit 3")
         );
-        for (RepaymentSchedule schedule : overdueList) {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", schedule.getScheduleId());
-            map.put("type", "overdue");
-            map.put("title", "合同" + schedule.getContractId() + "逾期，金额 ¥" + schedule.getCalculatedInterest());
-            map.put("time", schedule.getDueDate() != null ? schedule.getDueDate().toString() : "");
-            activities.add(map);
-        }
+        List<Map<String, Object>> list1 = overdueList.stream()
+                .map(schedule -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", schedule.getScheduleId());
+                    map.put("type", "overdue");
+                    map.put("title", "合同" + schedule.getContractId() + "逾期，金额 ¥" + schedule.getCalculatedInterest());
+                    map.put("time", schedule.getDueDate() != null ? schedule.getDueDate().toString() : "");
+                    activities.add(map);
+                    return map;
+                }).toList();
+
         // 3. 最近合同
         List<LoanContracts> contractList = loanContractsMapper.selectList(
-                new QueryWrapper<LoanContracts>()
-                        .orderByDesc("created_at")
+                new LambdaQueryWrapper<LoanContracts>()
+                        .orderByDesc(LoanContracts::getCreatedAt)
                         .last("limit 2")
         );
-        for (LoanContracts contract : contractList) {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", contract.getContractId());
-            map.put("type", "contract");
-            map.put("title", "新合同 " + contract.getContractId() + " 创建，客户ID " + contract.getCustomerId());
-            map.put("time", contract.getCreatedAt() != null ? contract.getCreatedAt().toString() : "");
-            activities.add(map);
-        }
+        List<Map<String, Object>> list2 = contractList.stream()
+                .map(contract -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", contract.getContractId());
+                    map.put("type", "contract");
+                    map.put("title", "新合同 " + contract.getContractId() + " 创建，客户ID " + contract.getCustomerId());
+                    map.put("time", contract.getCreatedAt() != null ? contract.getCreatedAt().toString() : "");
+                    activities.add(map);
+                    return map;
+                }).toList();
+
         // 按时间倒序，取前10条
         activities.sort((a, b) -> b.getOrDefault("time", "").toString().compareTo(a.getOrDefault("time", "").toString()));
         return activities.size() > 10 ? activities.subList(0, 10) : activities;

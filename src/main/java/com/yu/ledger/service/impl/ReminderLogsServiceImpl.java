@@ -1,5 +1,6 @@
 package com.yu.ledger.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.yu.ledger.entity.po.ReminderLogs;
 import com.yu.ledger.entity.po.Customers;
@@ -10,6 +11,7 @@ import com.yu.ledger.mapper.CustomersMapper;
 import com.yu.ledger.mapper.LoanContractsMapper;
 import com.yu.ledger.mapper.RepaymentScheduleMapper;
 import com.yu.ledger.service.IReminderLogsService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,21 +22,24 @@ import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static com.yu.ledger.entity.enums.ReminderStatusEnum.*;
+
 @Service
+@RequiredArgsConstructor
 public class ReminderLogsServiceImpl implements IReminderLogsService {
-    @Autowired
-    private ReminderLogsMapper reminderLogsMapper;
-    @Autowired
-    private CustomersMapper customersMapper;
-    @Autowired
-    private LoanContractsMapper loanContractsMapper;
-    @Autowired
-    private RepaymentScheduleMapper repaymentScheduleMapper;
+
+    private final ReminderLogsMapper reminderLogsMapper;
+
+    private final CustomersMapper customersMapper;
+
+    private final LoanContractsMapper loanContractsMapper;
+
+    private final RepaymentScheduleMapper repaymentScheduleMapper;
 
     @Override
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listReminders(Map<String, Object> params) {
-        QueryWrapper<ReminderLogs> wrapper = new QueryWrapper<>();
+        LambdaQueryWrapper<ReminderLogs> wrapper = new LambdaQueryWrapper<>();
 
         // 1. 模糊搜索关键字（支持客户姓名、合同号、合同名称）
         String keyword = (params.get("keyword") != null) ? params.get("keyword").toString().trim() : null;
@@ -43,21 +48,18 @@ public class ReminderLogsServiceImpl implements IReminderLogsService {
             List<Integer> relatedScheduleIds = new ArrayList<>();
             
             // 通过客户姓名查找
-            QueryWrapper<Customers> customerWrapper = new QueryWrapper<>();
-            customerWrapper.like("full_name", "%" + keyword + "%");
-            List<Customers> customers = customersMapper.selectList(customerWrapper);
+            List<Customers> customers = customersMapper.selectList(new LambdaQueryWrapper<Customers>()
+                    .like(Customers::getFullName, keyword));
             
             for (Customers customer : customers) {
                 // 查找该客户的合同
-                QueryWrapper<LoanContracts> contractWrapper = new QueryWrapper<>();
-                contractWrapper.eq("customer_id", customer.getCustomerId());
-                List<LoanContracts> contracts = loanContractsMapper.selectList(contractWrapper);
+                List<LoanContracts> contracts = loanContractsMapper.selectList(new LambdaQueryWrapper<LoanContracts>()
+                        .eq(LoanContracts::getCustomerId, customer.getCustomerId()));
                 
                 for (LoanContracts contract : contracts) {
                     // 查找该合同的还款计划
-                    QueryWrapper<RepaymentSchedule> scheduleWrapper = new QueryWrapper<>();
-                    scheduleWrapper.eq("contract_id", contract.getContractId());
-                    List<RepaymentSchedule> schedules = repaymentScheduleMapper.selectList(scheduleWrapper);
+                    List<RepaymentSchedule> schedules = repaymentScheduleMapper.selectList(new LambdaQueryWrapper<RepaymentSchedule>()
+                            .eq(RepaymentSchedule::getContractId, contract.getContractId()));
                     
                     for (RepaymentSchedule schedule : schedules) {
                         relatedScheduleIds.add(schedule.getScheduleId());
@@ -68,23 +70,20 @@ public class ReminderLogsServiceImpl implements IReminderLogsService {
             // 通过合同号查找（假设合同号就是contract_id）
             try {
                 Integer contractId = Integer.valueOf(keyword);
-                QueryWrapper<RepaymentSchedule> scheduleWrapper = new QueryWrapper<>();
-                scheduleWrapper.eq("contract_id", contractId);
-                List<RepaymentSchedule> schedules = repaymentScheduleMapper.selectList(scheduleWrapper);
+                List<RepaymentSchedule> schedules = repaymentScheduleMapper.selectList(new LambdaQueryWrapper<RepaymentSchedule>()
+                        .eq(RepaymentSchedule::getContractId, contractId));
                 for (RepaymentSchedule schedule : schedules) {
                     relatedScheduleIds.add(schedule.getScheduleId());
                 }
             } catch (NumberFormatException e) {
                 // 如果不是数字，尝试通过合同名称查找
-                QueryWrapper<LoanContracts> contractNameWrapper = new QueryWrapper<>();
-                contractNameWrapper.like("contract_name", "%" + keyword + "%");
-                List<LoanContracts> contractsByName = loanContractsMapper.selectList(contractNameWrapper);
+                List<LoanContracts> contractsByName = loanContractsMapper.selectList(new LambdaQueryWrapper<LoanContracts>()
+                        .like(LoanContracts::getContractName, keyword));
                 
                 for (LoanContracts contract : contractsByName) {
                     // 查找该合同的还款计划
-                    QueryWrapper<RepaymentSchedule> scheduleWrapper = new QueryWrapper<>();
-                    scheduleWrapper.eq("contract_id", contract.getContractId());
-                    List<RepaymentSchedule> schedules = repaymentScheduleMapper.selectList(scheduleWrapper);
+                    List<RepaymentSchedule> schedules = repaymentScheduleMapper.selectList(new LambdaQueryWrapper<RepaymentSchedule>()
+                            .eq(RepaymentSchedule::getContractId, contract.getContractId()));
                     
                     for (RepaymentSchedule schedule : schedules) {
                         relatedScheduleIds.add(schedule.getScheduleId());
@@ -94,7 +93,7 @@ public class ReminderLogsServiceImpl implements IReminderLogsService {
             
             // 如果找到了相关的schedule_id，则添加到查询条件中
             if (!relatedScheduleIds.isEmpty()) {
-                wrapper.in("schedule_id", relatedScheduleIds);
+                wrapper.in(ReminderLogs::getScheduleId, relatedScheduleIds);
             } else {
                 // 如果没有找到相关记录，返回空结果
                 return new ArrayList<>();
@@ -103,28 +102,28 @@ public class ReminderLogsServiceImpl implements IReminderLogsService {
 
         // 2. 精确匹配 reminder_type
         if (params.get("type") != null && StringUtils.hasText(params.get("type").toString())) {
-            wrapper.eq("reminder_type", params.get("type").toString());
+            wrapper.eq(ReminderLogs::getReminderType, params.get("type").toString());
         }
 
         // 3. 精确匹配 reminder_channel
         if (params.get("channel") != null && StringUtils.hasText(params.get("channel").toString())) {
-            wrapper.eq("reminder_channel", params.get("channel").toString());
+            wrapper.eq(ReminderLogs::getReminderChannel, params.get("channel").toString());
         }
 
         // 4. 匹配状态
         if (params.get("status") != null) {
             String status = params.get("status").toString();
             if ("success".equalsIgnoreCase(status)) {
-                wrapper.eq("reminder_status", "success");
+                wrapper.eq(ReminderLogs::getReminderStatus, SUCCESS);
             } else if ("failure".equalsIgnoreCase(status)) {
-                wrapper.eq("reminder_status", "failed");
+                wrapper.eq(ReminderLogs::getReminderStatus, FAILED);
             } else if ("pending".equalsIgnoreCase(status)) {
-                wrapper.eq("reminder_status", "pending");
+                wrapper.eq(ReminderLogs::getReminderStatus, PENDING);
             }
         }
 
         // 5. 按发送时间降序排序（最新到最旧）
-        wrapper.orderByDesc("sent_at");
+        wrapper.orderByDesc(ReminderLogs::getSentAt);
 
         // 查询数据
         List<ReminderLogs> list = reminderLogsMapper.selectList(wrapper);
