@@ -1,0 +1,101 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* 确保Element Plus组件也能充分利用空间 */
+.el-container {
+  height: 100vh !important;
+}
+
+.el-aside {
+  height: 100vh !important;
+  overflow: hidden !important;
+}
+
+.el-main {
+  height: calc(100vh - 60px) !important;
+  padding: 0 !important;
+  overflow-y: auto;
+}
+
+.el-header {
+  height: 60px !important;
+  line-height: 60px !important;
+  padding: 0 20px !important;
+}
+
+/* 移除所有默认的边距和内边距 */
+.el-card {
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+
+.el-card__body {
+  padding: 20px !important;
+}
+
+/* 确保表格容器充分利用空间 */
+.el-table {
+  width: 100% !important;
+}
+
+/* 移除不必要的空白 */
+.el-row {
+  margin: 0 !important;
+}
+
+.el-col {
+  padding: 0 !important;
+}
+
+/* 调整卡片间距 */
+.el-card + .el-card {
+  margin-top: 20px !important;
+}
+
+/* 确保侧边栏菜单充分利用高度 */
+.el-menu {
+  height: auto !important;
+  border-right: none !important;
+  overflow: visible !important;
+}
+
+/* 调整主内容区域的滚动 */
+.el-main::-webkit-scrollbar {
+  width: 6px;
+}
+
+.el-main::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.el-main::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.el-main::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
